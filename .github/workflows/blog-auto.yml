@@ -2,25 +2,35 @@ name: HOPE ブログ自動投稿
 
 on:
   schedule:
+    # 日本時間 毎朝10時・2日に1回（UTC 01:00, 1/3/5/7/9/11/13/15/17/19/21/23/25/27/29/31日）
     - cron: '0 1 */2 * *'
+
+  # 手動でも実行できるボタンを追加
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   post-blog:
     runs-on: ubuntu-latest
 
     steps:
+      # リポジトリをチェックアウト
       - name: リポジトリをチェックアウト
         uses: actions/checkout@v4
 
+      # Pythonをセットアップ
       - name: Python 3.11 をセットアップ
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
+      # 依存パッケージをインストール
       - name: パッケージをインストール
         run: pip install -r requirements.txt
 
+      # ブログ自動投稿スクリプトを実行
       - name: ブログを生成して投稿
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -30,6 +40,7 @@ jobs:
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
         run: python auto_blog.py
 
+      # 使用済みキーワードリストをコミットして保存
       - name: 使用済みキーワードを保存
         run: |
           git config --local user.email "action@github.com"
