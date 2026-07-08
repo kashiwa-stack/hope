@@ -382,6 +382,7 @@ def post_to_wordpress(article_text: str, kw: dict, media_id: int = 0) -> str:
         post_data["featured_media"] = media_id
 
     # 認証テスト（/users/me で認証が通るか確認）
+    print(f"🌐 投稿先URL: {wp_url}")
     print(f"🔑 WordPress認証テスト中...")
     auth_test = requests.get(
         f"{wp_url}/wp-json/wp/v2/users/me",
