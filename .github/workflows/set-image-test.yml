@@ -1,0 +1,35 @@
+name: テスト：アイキャッチ画像設定
+
+on:
+  workflow_dispatch:
+    inputs:
+      post_id:
+        description: 'WordPress 記事ID（例: 3006）'
+        required: true
+        default: '3006'
+
+permissions:
+  contents: read
+
+jobs:
+  set-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 をセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: パッケージをインストール
+        run: pip install requests
+
+      - name: アイキャッチ画像を設定
+        env:
+          WP_URL: ${{ secrets.WP_URL }}
+          WP_USERNAME: ${{ secrets.WP_USERNAME }}
+          WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+          POST_ID: ${{ github.event.inputs.post_id }}
+        run: python set_image.py
