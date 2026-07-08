@@ -45,6 +45,6 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Actions Bot"
-          git add used_keywords.json
+          git add used_keywords.json last_post_info.json
           git diff --staged --quiet || git commit -m "✅ ブログ投稿完了: $(date '+%Y-%m-%d')"
           git push
