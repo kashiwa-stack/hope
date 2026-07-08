@@ -2,11 +2,11 @@
 """
 HOPE ブログ全自動生成スクリプト
 ================================
-キーワード選択 → Claude記事生成 → DALL-E 3画像生成 → WordPress自動投稿
+キーワード選択 → Claude記事生成 → DALL-E画像生成（失敗時スキップ） → WordPress自動投稿
 
 必要な環境変数（GitHub Secrets に設定すること）:
   ANTHROPIC_API_KEY   : AnthropicのAPIキー
-  OPENAI_API_KEY      : OpenAIのAPIキー
+  OPENAI_API_KEY      : OpenAIのAPIキー（画像生成用。未設定時は画像なしで投稿）
   WP_URL              : WordPressサイトURL（例: https://hope-kids.com）
   WP_USERNAME         : WordPressのユーザー名（例: admin）
   WP_APP_PASSWORD     : WordPressのアプリケーションパスワード
@@ -334,7 +334,7 @@ def get_or_create_tag(wp_url, headers, tag_name) -> int:
     return r2.json()["id"]
 
 
-def post_to_wordpress(article_text: str, media_id: int, kw: dict) -> str:
+def post_to_wordpress(article_text: str, kw: dict, media_id: int = 0) -> str:
     """WordPressに記事を投稿してURLを返す"""
     wp_url = os.environ["WP_URL"].rstrip("/")
     auth_headers = get_wp_auth()
@@ -372,11 +372,14 @@ def post_to_wordpress(article_text: str, media_id: int, kw: dict) -> str:
         "content": body,
         "status": WP_POST_STATUS,
         "slug": slug,
-        "featured_media": media_id,
         "tags": tag_ids,
         "excerpt": wp_settings.get("meta_description", ""),
         "author": 1,  # デフォルトの投稿者（必要なら変更）
     }
+
+    # アイキャッチ画像がある場合のみ設定
+    if media_id:
+        post_data["featured_media"] = media_id
 
     print(f"📤 WordPressに記事を投稿中...")
     response = requests.post(
@@ -412,17 +415,25 @@ def main():
     article_text = generate_article(kw)
     print(f"\n✅ 記事生成完了（{len(article_text)}文字）")
 
-    # 3. 画像生成
-    image_bytes = generate_image(kw)
-    print(f"✅ 画像生成完了（{len(image_bytes) // 1024}KB）")
+    # 3. 画像生成（失敗しても記事投稿は続行する）
+    media_id = 0
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
+    if openai_key:
+        try:
+            image_bytes = generate_image(kw)
+            print(f"✅ 画像生成完了（{len(image_bytes) // 1024}KB）")
 
-    # 4. 画像アップロード
-    filename = f"hope-blog-{kw['no']}-{datetime.now().strftime('%Y%m%d')}.png"
-    media_id = upload_image_to_wp(image_bytes, filename)
-    print(f"✅ 画像アップロード完了")
+            # 4. 画像アップロード
+            filename = f"hope-blog-{kw['no']}-{datetime.now().strftime('%Y%m%d')}.png"
+            media_id = upload_image_to_wp(image_bytes, filename)
+            print(f"✅ 画像アップロード完了")
+        except Exception as img_err:
+            print(f"⚠️ 画像生成/アップロード失敗（スキップして記事投稿を続行）: {img_err}")
+    else:
+        print("⚠️ OPENAI_API_KEY 未設定のため画像生成をスキップ")
 
     # 5. 記事投稿
-    post_url = post_to_wordpress(article_text, media_id, kw)
+    post_url = post_to_wordpress(article_text, kw, media_id)
     print(f"✅ 記事投稿完了")
 
     # 6. 使用済みとして記録
