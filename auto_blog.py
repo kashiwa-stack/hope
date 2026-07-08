@@ -456,10 +456,25 @@ def main():
     # 6. 使用済みとして記録
     save_used_keyword(kw["no"])
 
+    # 7. 最終投稿情報をファイルに保存（デバッグ・確認用）
+    wp_url_env = os.environ.get("WP_URL", "未設定")
+    last_post = {
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "keyword_no": kw["no"],
+        "keyword": kw["keyword"],
+        "title": kw["title"],
+        "wp_url": wp_url_env,
+        "post_link": post_url,
+    }
+    with open("last_post_info.json", "w", encoding="utf-8") as f:
+        json.dump(last_post, f, ensure_ascii=False, indent=2)
+    print(f"💾 投稿情報を last_post_info.json に保存しました")
+
     print("\n" + "=" * 50)
     print(f"🎉 完了！")
     print(f"   キーワード: No.{kw['no']} 「{kw['keyword']}」")
     print(f"   投稿URL: {post_url}")
+    print(f"   投稿先サイト: {wp_url_env}")
     print(f"   残りキーワード: {len(keywords) - len(load_used_keywords())}件")
     print("=" * 50)
 
