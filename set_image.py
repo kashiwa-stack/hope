@@ -47,16 +47,32 @@ def keyword_to_english(title: str) -> str:
     return "speech therapy children japan"  # デフォルト
 
 def fetch_unsplash_image(search_term: str) -> bytes:
-    """Unsplashからランダム関連画像を取得"""
-    url = f"https://source.unsplash.com/featured/1200x630/?{search_term.replace(' ', ',')}"
-    print(f"   検索ワード: {search_term}")
-    print(f"   URL: {url}")
+    """Pexels APIから関連画像を取得（PEXELS_API_KEY が必要）
+    フォールバック: picsum.photos のランダム高品質写真"""
+    pexels_key = os.environ.get("PEXELS_API_KEY", "")
+    if pexels_key:
+        # Pexels API（テーマに合った写真）
+        headers = {"Authorization": pexels_key}
+        r = requests.get(
+            "https://api.pexels.com/v1/search",
+            headers=headers,
+            params={"query": search_term, "per_page": 1, "orientation": "landscape"},
+            timeout=15,
+        )
+        r.raise_for_status()
+        photos = r.json().get("photos", [])
+        if photos:
+            img_url = photos[0]["src"]["large2x"]
+            print(f"   ✅ Pexels から取得: {img_url[:60]}...")
+            img_r = requests.get(img_url, timeout=30)
+            img_r.raise_for_status()
+            return img_r.content
+
+    # フォールバック: picsum.photos（ランダム高品質写真、APIキー不要）
+    url = "https://picsum.photos/1200/630"
+    print(f"   📸 picsum.photos からランダム写真を取得中...")
     r = requests.get(url, timeout=30, allow_redirects=True)
     r.raise_for_status()
-    # Content-Typeが画像かチェック
-    content_type = r.headers.get("Content-Type", "")
-    if "image" not in content_type:
-        raise ValueError(f"画像が返ってきませんでした: {content_type}")
     return r.content
 
 def upload_image_to_wp(image_bytes: bytes, filename: str) -> int:
