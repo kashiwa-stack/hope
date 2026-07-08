@@ -234,12 +234,11 @@ playing, reading together, or a gentle speech therapist visiting their home.
 No text. No letters. No words in the image.
 Horizontal format (16:9). Child-friendly. Professional yet approachable."""
 
-    print(f"🎨 DALL-E 3で画像を生成中...")
+    print(f"🎨 DALL-E 2で画像を生成中...")
     response = client.images.generate(
-        model="dall-e-3",
+        model="dall-e-2",
         prompt=image_prompt,
-        size="1792x1024",
-        quality="standard",
+        size="1024x1024",
         n=1,
     )
 
