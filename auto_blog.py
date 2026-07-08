@@ -381,6 +381,20 @@ def post_to_wordpress(article_text: str, kw: dict, media_id: int = 0) -> str:
     if media_id:
         post_data["featured_media"] = media_id
 
+    # 認証テスト（/users/me で認証が通るか確認）
+    print(f"🔑 WordPress認証テスト中...")
+    auth_test = requests.get(
+        f"{wp_url}/wp-json/wp/v2/users/me",
+        headers=auth_headers,
+        timeout=10,
+    )
+    if auth_test.status_code == 200:
+        me = auth_test.json()
+        print(f"   ✅ 認証OK: ユーザー={me.get('name')} / ロール={me.get('roles')}")
+    else:
+        print(f"   ⚠️ 認証テスト失敗: HTTP {auth_test.status_code}")
+        print(f"   詳細: {auth_test.text[:300]}")
+
     print(f"📤 WordPressに記事を投稿中...")
     response = requests.post(
         f"{wp_url}/wp-json/wp/v2/posts",
@@ -388,6 +402,8 @@ def post_to_wordpress(article_text: str, kw: dict, media_id: int = 0) -> str:
         json=post_data,
         timeout=30,
     )
+    if not response.ok:
+        print(f"⚠️ WP APIエラー HTTP {response.status_code}: {response.text[:500]}")
     response.raise_for_status()
     post_url = response.json().get("link", "")
     print(f"   → 投稿URL: {post_url}")
