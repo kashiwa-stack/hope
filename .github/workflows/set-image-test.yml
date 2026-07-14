@@ -1,18 +1,13 @@
-name: テスト：アイキャッチ画像設定
+name: アイキャッチ画像：全下書きに一括設定
 
 on:
   workflow_dispatch:
-    inputs:
-      post_id:
-        description: 'WordPress 記事ID（例: 3006）'
-        required: true
-        default: '3006'
 
 permissions:
   contents: read
 
 jobs:
-  set-image:
+  set-images:
     runs-on: ubuntu-latest
     steps:
       - name: リポジトリをチェックアウト
@@ -26,10 +21,10 @@ jobs:
       - name: パッケージをインストール
         run: pip install requests
 
-      - name: アイキャッチ画像を設定
+      - name: 全下書きにアイキャッチ画像を設定
         env:
           WP_URL: ${{ secrets.WP_URL }}
           WP_USERNAME: ${{ secrets.WP_USERNAME }}
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
-          POST_ID: ${{ github.event.inputs.post_id }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         run: python set_image.py
