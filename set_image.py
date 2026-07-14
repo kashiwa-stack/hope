@@ -1,5 +1,5 @@
 """
-テスト用：既存のWordPress記事にUnsplash画像をアイキャッチとして設定する
+全ての下書きWordPress記事にPexels画像をアイキャッチとして一括設定するスクリプト
 """
 import os
 import base64
@@ -8,72 +8,96 @@ import requests
 WP_URL = os.environ["WP_URL"].rstrip("/")
 WP_USERNAME = os.environ["WP_USERNAME"]
 WP_APP_PASSWORD = os.environ["WP_APP_PASSWORD"]
-POST_ID = int(os.environ.get("POST_ID", "3006"))
+PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY", "")
 
-# キーワード → 英語検索ワードの簡易マッピング
+# キーワード → Pexels検索ワード（アジア系・日本風の写真が出やすいキーワード）
 KEYWORD_MAP = {
-    "通級": "speech therapy classroom children",
-    "ことば": "child speech language therapy",
-    "言語": "speech language pathology child",
-    "吃音": "child speech therapy communication",
-    "場面緘黙": "shy child therapy support",
-    "発達": "child development therapy",
-    "構音": "speech articulation therapy child",
-    "サ行": "speech therapy child practice",
+    "通級":     "asian child school learning classroom",
+    "ことば":   "asian child speech communication smile",
+    "言語":     "asian child speak learning",
+    "吃音":     "asian child speaking confidence",
+    "場面緘黙": "asian child calm support therapy",
+    "発達":     "asian child development learning play",
+    "構音":     "asian child practice speech mouth",
+    "サ行":     "asian child speech practice learning",
+    "読み書き": "asian child reading book study",
+    "聴覚":     "asian child listen hearing",
+    "自閉":     "asian child play therapy support",
+    "訓練":     "asian child therapy exercise",
+    "支援":     "asian child care support family",
+    "相談":     "asian parent child consultation",
+    "幼児":     "asian toddler child play smile",
+    "小学":     "asian child elementary school study",
+    "保育":     "asian child nursery play happy",
 }
+
+DEFAULT_SEARCH = "asian child smile learning"
+
 
 def get_wp_auth():
     credentials = f"{WP_USERNAME}:{WP_APP_PASSWORD}"
     token = base64.b64encode(credentials.encode()).decode("utf-8")
     return {"Authorization": f"Basic {token}"}
 
-def get_post_info(post_id):
-    """投稿のキーワード情報を取得"""
-    auth = get_wp_auth()
-    r = requests.get(
-        f"{WP_URL}/wp-json/wp/v2/posts/{post_id}",
-        headers=auth,
-        timeout=10,
-    )
-    if r.status_code == 200:
-        return r.json()
-    return {}
 
-def keyword_to_english(title: str) -> str:
-    """タイトルからUnsplash用の英語キーワードを生成"""
+def get_all_draft_posts():
+    """全ての下書き記事を取得"""
+    auth = get_wp_auth()
+    posts = []
+    page = 1
+    while True:
+        r = requests.get(
+            f"{WP_URL}/wp-json/wp/v2/posts",
+            headers=auth,
+            params={"status": "draft", "per_page": 100, "page": page},
+            timeout=15,
+        )
+        data = r.json()
+        if r.status_code == 400 or not data:
+            break
+        r.raise_for_status()
+        posts.extend(data)
+        page += 1
+    return posts
+
+
+def title_to_search_term(title: str) -> str:
+    """タイトルから英語検索ワードを生成"""
     for jp, en in KEYWORD_MAP.items():
         if jp in title:
             return en
-    return "speech therapy children japan"  # デフォルト
+    return DEFAULT_SEARCH
 
-def fetch_unsplash_image(search_term: str) -> bytes:
-    """Pexels APIから関連画像を取得（PEXELS_API_KEY が必要）
-    フォールバック: picsum.photos のランダム高品質写真"""
-    pexels_key = os.environ.get("PEXELS_API_KEY", "")
-    if pexels_key:
-        # Pexels API（テーマに合った写真）
-        headers = {"Authorization": pexels_key}
-        r = requests.get(
-            "https://api.pexels.com/v1/search",
-            headers=headers,
-            params={"query": search_term, "per_page": 1, "orientation": "landscape"},
-            timeout=15,
-        )
-        r.raise_for_status()
-        photos = r.json().get("photos", [])
-        if photos:
-            img_url = photos[0]["src"]["large2x"]
-            print(f"   ✅ Pexels から取得: {img_url[:60]}...")
-            img_r = requests.get(img_url, timeout=30)
-            img_r.raise_for_status()
-            return img_r.content
 
-    # フォールバック: picsum.photos（ランダム高品質写真、APIキー不要）
-    url = "https://picsum.photos/1200/630"
-    print(f"   📸 picsum.photos からランダム写真を取得中...")
-    r = requests.get(url, timeout=30, allow_redirects=True)
+def fetch_pexels_image(search_term: str) -> bytes:
+    """Pexels APIからアジア系の写真を取得"""
+    headers = {"Authorization": PEXELS_API_KEY}
+    r = requests.get(
+        "https://api.pexels.com/v1/search",
+        headers=headers,
+        params={
+            "query": search_term,
+            "per_page": 5,
+            "orientation": "landscape",
+            "size": "large",
+        },
+        timeout=15,
+    )
     r.raise_for_status()
-    return r.content
+    photos = r.json().get("photos", [])
+    if not photos:
+        raise ValueError(f"'{search_term}' で写真が見つかりませんでした")
+
+    photo = photos[0]
+    img_url = photo["src"]["large2x"]
+    photographer = photo.get("photographer", "Pexels")
+    print(f"   📸 写真URL: {img_url[:70]}...")
+    print(f"   撮影者: {photographer}")
+
+    img_r = requests.get(img_url, timeout=30)
+    img_r.raise_for_status()
+    return img_r.content
+
 
 def upload_image_to_wp(image_bytes: bytes, filename: str) -> int:
     """WordPressメディアライブラリにアップロード"""
@@ -92,6 +116,7 @@ def upload_image_to_wp(image_bytes: bytes, filename: str) -> int:
     r.raise_for_status()
     return r.json()["id"]
 
+
 def set_featured_image(post_id: int, media_id: int):
     """投稿にアイキャッチ画像を設定"""
     auth = get_wp_auth()
@@ -103,26 +128,52 @@ def set_featured_image(post_id: int, media_id: int):
         timeout=30,
     )
     r.raise_for_status()
-    return r.json()
+
 
 # ===== メイン処理 =====
-print(f"🔍 投稿 #{POST_ID} の情報を取得中...")
-post = get_post_info(POST_ID)
-title = post.get("title", {}).get("rendered", "")
-print(f"   タイトル: {title}")
+if not PEXELS_API_KEY:
+    print("❌ PEXELS_API_KEY が設定されていません")
+    exit(1)
 
-search_term = keyword_to_english(title)
-print(f"\n🖼️  Unsplash から画像を取得中...")
-image_bytes = fetch_unsplash_image(search_term)
-print(f"   ✅ 画像取得完了 ({len(image_bytes) // 1024} KB)")
+print("📋 下書き記事を取得中...")
+drafts = get_all_draft_posts()
+print(f"   {len(drafts)} 件の下書きを取得しました\n")
 
-print(f"\n📤 WordPress にアップロード中...")
-media_id = upload_image_to_wp(image_bytes, f"eyecatch-post{POST_ID}.jpg")
-print(f"   ✅ アップロード完了（メディアID: {media_id}）")
+success = 0
+skipped = 0
+failed = 0
 
-print(f"\n🔗 投稿 #{POST_ID} にアイキャッチを設定中...")
-set_featured_image(POST_ID, media_id)
-print(f"   ✅ 設定完了！")
+for post in drafts:
+    post_id = post["id"]
+    title = post.get("title", {}).get("rendered", f"post-{post_id}")
+    has_image = post.get("featured_media", 0)
 
-print(f"\n👀 確認URL:")
-print(f"   {WP_URL}/wp-admin/post.php?post={POST_ID}&action=edit")
+    if has_image:
+        print(f"⏭️  #{post_id}「{title}」→ 画像あり（スキップ）")
+        skipped += 1
+        continue
+
+    print(f"\n🖼️  #{post_id}「{title}」")
+    try:
+        search_term = title_to_search_term(title)
+        print(f"   検索: {search_term}")
+        image_bytes = fetch_pexels_image(search_term)
+        print(f"   ✅ 取得完了 ({len(image_bytes) // 1024} KB)")
+
+        media_id = upload_image_to_wp(image_bytes, f"eyecatch-{post_id}.jpg")
+        print(f"   ✅ アップロード完了（ID: {media_id}）")
+
+        set_featured_image(post_id, media_id)
+        print(f"   ✅ アイキャッチ設定完了！")
+        success += 1
+
+    except Exception as e:
+        print(f"   ❌ エラー: {e}")
+        failed += 1
+
+print(f"\n{'='*40}")
+print(f"✅ 設定完了: {success} 件")
+print(f"⏭️  スキップ: {skipped} 件（既に画像あり）")
+print(f"❌ エラー:   {failed} 件")
+print(f"{'='*40}")
+print(f"\n📝 確認: {WP_URL}/wp-admin/edit.php")
