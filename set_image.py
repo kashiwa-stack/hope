@@ -10,28 +10,57 @@ WP_USERNAME = os.environ["WP_USERNAME"]
 WP_APP_PASSWORD = os.environ["WP_APP_PASSWORD"]
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY", "")
 
-# キーワード → Pexels検索ワード（アジア系・日本風の写真が出やすいキーワード）
+# キーワード → Pexels検索ワードリスト（複数候補から記事番号で選択 → 多様性確保）
 KEYWORD_MAP = {
-    "通級":     "asian child school learning classroom",
-    "ことば":   "asian child speech communication smile",
-    "言語":     "asian child speak learning",
-    "吃音":     "asian child speaking confidence",
-    "場面緘黙": "asian child calm support therapy",
-    "発達":     "asian child development learning play",
-    "構音":     "asian child practice speech mouth",
-    "サ行":     "asian child speech practice learning",
-    "読み書き": "asian child reading book study",
-    "聴覚":     "asian child listen hearing",
-    "自閉":     "asian child play therapy support",
-    "訓練":     "asian child therapy exercise",
-    "支援":     "asian child care support family",
-    "相談":     "asian parent child consultation",
-    "幼児":     "asian toddler child play smile",
-    "小学":     "asian child elementary school study",
-    "保育":     "asian child nursery play happy",
+    "通級":     ["asian boy school classroom", "japanese child school desk study",
+                 "elementary school classroom asia", "child studying book pencil"],
+    "ことば":   ["asian mother child communication", "japanese family talking smile",
+                 "asian girl speech smile", "parent child reading together"],
+    "言語":     ["speech therapy child asian", "asian boy language learning",
+                 "child book reading smile asia", "japanese child learning activity"],
+    "吃音":     ["asian boy speaking confidence", "child communication talk",
+                 "japanese boy presentation school", "asian child talk smile"],
+    "場面緘黙": ["calm child japanese indoor", "quiet shy child support",
+                 "japanese child nature calm", "asian child indoor peaceful"],
+    "発達":     ["asian boy outdoor play happy", "japanese child development activity",
+                 "children playing park asia", "child drawing painting creative"],
+    "構音":     ["asian boy mouth speech practice", "japanese child sing voice",
+                 "child therapy session indoor", "speech practice child boy"],
+    "サ行":     ["asian boy talking lesson", "japanese child practice speech",
+                 "child language practice indoor", "boy speech therapy session"],
+    "読み書き": ["asian boy reading book", "japanese child writing study",
+                 "child notebook pencil school", "asian student study desk"],
+    "聴覚":     ["child hearing test clinic", "asian child listen music headphone",
+                 "ear health child medical", "japanese child doctor checkup"],
+    "自閉":     ["child sensory play indoor", "japanese child creative activity",
+                 "child therapy calm indoor", "asian boy puzzle play focus"],
+    "訓練":     ["speech therapist child session", "child rehabilitation indoor",
+                 "asian boy therapy exercise", "professional child therapy"],
+    "支援":     ["japanese family home smile", "asian mother son indoor",
+                 "family support home care", "japanese parent child together"],
+    "相談":     ["japanese family consultation smile", "asian parent talk adult",
+                 "family meeting indoor table", "parent child discussion warm"],
+    "幼児":     ["asian toddler boy play", "japanese baby child happy",
+                 "toddler indoor play colorful", "young child smile play asia"],
+    "小学":     ["asian boy elementary school", "japanese school child study",
+                 "child backpack school asia", "asian student classroom boy"],
+    "保育":     ["japanese nursery child play", "kindergarten asia children play",
+                 "childcare center indoor play", "asian children group activity"],
+    "費用":     ["japanese family budget planning", "asian adult consultation desk",
+                 "medical consultation professional", "family finance discussion"],
+    "柏市":     ["japanese suburb family home", "chiba japan neighborhood",
+                 "japanese residential area green", "japan suburb child outdoor"],
+    "流山市":   ["japanese family park walk", "japan suburb child nature",
+                 "japanese outdoor family smile", "asian family park weekend"],
 }
 
-DEFAULT_SEARCH = "asian child smile learning"
+DEFAULT_SEARCH_LIST = [
+    "asian boy child learning smile",
+    "japanese family home warm",
+    "asian child outdoor happy play",
+    "japanese mother child indoor",
+    "child development learning asia",
+]
 
 
 def get_wp_auth():
@@ -61,12 +90,14 @@ def get_all_draft_posts():
     return posts
 
 
-def title_to_search_term(title: str) -> str:
-    """タイトルから英語検索ワードを生成"""
-    for jp, en in KEYWORD_MAP.items():
+def title_to_search_term(title: str, post_id: int = 0) -> str:
+    """タイトルから英語検索ワードを生成（複数候補からpost_idで選択して多様性確保）"""
+    for jp, candidates in KEYWORD_MAP.items():
         if jp in title:
-            return en
-    return DEFAULT_SEARCH
+            idx = post_id % len(candidates)
+            return candidates[idx]
+    idx = post_id % len(DEFAULT_SEARCH_LIST)
+    return DEFAULT_SEARCH_LIST[idx]
 
 
 def fetch_pexels_image(search_term: str) -> bytes:
@@ -155,7 +186,7 @@ for post in drafts:
 
     print(f"\n🖼️  #{post_id}「{title}」")
     try:
-        search_term = title_to_search_term(title)
+        search_term = title_to_search_term(title, post_id)
         print(f"   検索: {search_term}")
         image_bytes = fetch_pexels_image(search_term)
         print(f"   ✅ 取得完了 ({len(image_bytes) // 1024} KB)")

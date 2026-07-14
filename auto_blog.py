@@ -196,7 +196,13 @@ def generate_article(kw: dict) -> str:
   書き方: {format_hint}
 
 【出力形式】
-Markdown形式で記事本文のみを出力してください。
+HTML形式で記事本文のみを出力してください。
+- 見出しは <h2>、<h3> タグを使用（# や ## は使わない）
+- 箇条書きは <ul><li> タグを使用（* や - は使わない）
+- 太字は <strong> タグを使用（** は使わない）
+- 段落は <p> タグで囲む
+- リンクは <a href="..."> タグを使用
+- HTMLタグ以外の特殊記号（#・*・**・---など）は使わない
 記事末尾にWordPress設定を以下の形式で付けてください：
 
 ---【WordPress設定】---
@@ -348,12 +354,12 @@ def post_to_wordpress(article_text: str, kw: dict, media_id: int = 0) -> str:
     # WordPress設定の解析
     wp_settings = parse_wp_settings(article_text)
 
-    # タイトルを最初のH1から抽出
+    # タイトルを抽出（HTML h1タグ優先、なければkw["title"]）
+    import re as _re
     title = kw["title"]
-    for line in body.split("\n"):
-        if line.startswith("# "):
-            title = line[2:].strip()
-            break
+    h1_match = _re.search(r'<h1[^>]*>(.*?)</h1>', body, _re.IGNORECASE | _re.DOTALL)
+    if h1_match:
+        title = _re.sub(r'<[^>]+>', '', h1_match.group(1)).strip()
 
     # タグIDの取得・作成
     tag_ids = []
